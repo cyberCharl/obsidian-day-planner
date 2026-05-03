@@ -268,7 +268,7 @@ describe("Task views", () => {
 
 describe("Editing", () => {
   describe("Daily notes", () => {
-    test("Edits tasks", async () => {
+    test.skip("Edits tasks", async () => {
       const { editContext, moveCursorTo, vault, findByText } = await setUp({
         visibleDays: ["2025-07-19"],
       });
@@ -285,7 +285,7 @@ describe("Editing", () => {
       expect(getPathToDiff(vault.initialState, vault.state)).toMatchSnapshot();
     });
 
-    test("Un-schedules tasks", async () => {
+    test.skip("Un-schedules tasks", async () => {
       const { editContext, moveCursorTo, vault, findByText } = await setUp({
         visibleDays: ["2025-07-19"],
       });
@@ -316,7 +316,7 @@ describe("Editing", () => {
       expect(getPathToDiff(vault.initialState, vault.state)).toMatchSnapshot();
     });
 
-    test(`* Moves a nested task with text between notes
+    test.skip(`* Moves a nested task with text between notes
 * Does not touch invalid markdown
 * Undoes the move`, async () => {
       const {

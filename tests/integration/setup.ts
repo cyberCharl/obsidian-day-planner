@@ -18,6 +18,7 @@ import type { DataviewFacade } from "../../src/service/dataview-facade";
 import { TransactionWriter } from "../../src/service/diff-writer";
 import { ListPropsParser } from "../../src/service/list-props-parser";
 import type { PeriodicNotes } from "../../src/service/periodic-notes";
+import type { TimeLayerService } from "../../src/service/time-layer-service";
 import { VaultFacade } from "../../src/service/vault-facade";
 import type { WorkspaceFacade } from "../../src/service/workspace-facade";
 import {
@@ -122,6 +123,12 @@ export async function setUp(props?: {
   const layoutReady = writable(true);
   const settingsStore = writable(settings);
   const currentTime = writable(window.moment());
+  const timeLayer = {
+    plannedTasks: writable([]),
+    activeActualTasks: writable([]),
+    recentActualTasks: writable([]),
+    getActualTasksForDay: () => writable([]),
+  } as unknown as TimeLayerService;
 
   const onEditCanceled = vi.fn();
   const onEditConfirmed = vi.fn();
@@ -175,6 +182,7 @@ export async function setUp(props?: {
     onUpdate,
     onEditAborted: () => {},
     periodicNotes,
+    timeLayer,
     dataviewFacade,
     metadataCache,
     workspaceFacade,

@@ -1,23 +1,19 @@
 <script lang="ts">
   import type { Moment } from "moment";
-  import { get } from "svelte/store";
+  import { get, fromStore } from "svelte/store";
   import { isNotVoid } from "typed-assert";
 
   import { getObsidianContext } from "../../context/obsidian-context";
-  import { currentTimeSignal, isToday } from "../../global-store/current-time";
+  import { isToday } from "../../global-store/current-time";
   import { getVisibleHours, snap } from "../../global-store/derived-settings";
-  import { selectLogEntriesForDay } from "../../redux";
+  import { addHorizontalPlacing } from "../../overlap/overlap";
   import {
     getPointerOffsetY,
     isTouchEvent,
     offsetYToMinutes,
   } from "../../util/dom";
   import { minutesToMomentOfDay } from "../../util/moment";
-  import {
-    getBlockProps,
-    getDayKey,
-    getRenderKey,
-  } from "../../util/task-utils";
+  import { getBlockProps, getRenderKey } from "../../util/task-utils";
   import { createGestures } from "../actions/gestures";
 
   import Column from "./column.svelte";
@@ -41,14 +37,15 @@
     },
     pointerDateTime,
     settingsSignal,
-    useSelectorV2: useSelector,
+    timeLayer,
   } = getObsidianContext();
 
   const displayedTasksForTimeline = $derived(getDisplayedTasksForTimeline(day));
-  const dayKey = $derived(getDayKey(day));
-
-  const logEntriesForDay = useSelector((state) =>
-    selectLogEntriesForDay(state, dayKey, currentTimeSignal.current),
+  const actualTasks = fromStore(timeLayer.actualTasks);
+  const actualTasksForDay = $derived(
+    addHorizontalPlacing(
+      actualTasks.current.filter((task) => task.startTime.isSame(day, "day")),
+    ),
   );
 
   let el: HTMLElement | undefined = $state();
@@ -100,6 +97,8 @@
 
 {#if $settings.timelineColumns.planner}
   <Column visibleHours={getVisibleHours($settings)}>
+    <div class="lane-label">Planned</div>
+
     {#if $isToday(day)}
       <Needle autoScrollBlocked={isUnderCursor} />
     {/if}
@@ -133,12 +132,14 @@
 
 {#if $settings.timelineColumns.timeTracker}
   <Column visibleHours={getVisibleHours($settings)}>
+    <div class="lane-label lane-label-actual">Actual</div>
+
     {#if $isToday(day)}
       <Needle autoScrollBlocked={isUnderCursor} showBall={false} />
     {/if}
 
     <div class="tasks absolute-stretch-x">
-      {#each logEntriesForDay.current as task (task.id)}
+      {#each actualTasksForDay as task (task.id)}
         <PositionedTimeBlock {task}>
           <LocalTimeBlock {task}>
             {#snippet bottomDecoration()}
@@ -160,5 +161,29 @@
     flex-direction: column;
 
     margin-inline: var(--size-4-2);
+  }
+
+  .lane-label {
+    position: sticky;
+    z-index: 2;
+    top: 0;
+
+    width: fit-content;
+    margin: var(--size-2-1);
+    padding: 0 var(--size-2-1);
+
+    font-size: var(--font-ui-smaller);
+    font-weight: var(--font-medium);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+
+    background: color-mix(in srgb, var(--background-primary) 85%, transparent);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+  }
+
+  .lane-label-actual {
+    color: var(--color-accent);
   }
 </style>

@@ -18,7 +18,7 @@ import {
   reQueryAfterMillis,
   icalRefreshIntervalMillis,
 } from "./constants";
-import { createUpdateHandler, getTextFromUser } from "./create-update-handler";
+import { getTextFromUser } from "./create-update-handler";
 import { createDumpMetadataCommand } from "./dump-metadata";
 import { TimeTrackingFeature } from "./feature/time-tracking-feature";
 import { currentTime } from "./global-store/current-time";
@@ -37,22 +37,23 @@ import { editCanceled, visibleDaysUpdated } from "./redux/global-slice";
 import { icalRefreshRequested } from "./redux/ical/ical-slice";
 import { settingsUpdated } from "./redux/settings-slice";
 import { type AppDispatch, type AppStore, createReactor } from "./redux/store";
-import { selectActiveClocks } from "./redux/tracker/tracker-slice";
 import { createUseSelector, createUseSelectorV2 } from "./redux/use-selector";
 import { createSvelteSignalFromReduxStore } from "./redux/use-selector";
 import { DataviewFacade } from "./service/dataview-facade";
-import { TransactionWriter } from "./service/diff-writer";
 import { ListPropsParser } from "./service/list-props-parser";
 import { MetadataCacheFacade } from "./service/metadata-cache-facade";
 import { PeriodicNotes } from "./service/periodic-notes";
 import { TaskEntryEditor } from "./service/task-entry-editor";
+import {
+  createTimeLayerUpdateHandler,
+  TimeLayerService,
+} from "./service/time-layer-service";
 import { VaultFacade } from "./service/vault-facade";
 import { WorkspaceFacade } from "./service/workspace-facade";
 import { type DayPlannerSettings, defaultSettings } from "./settings";
 import type { RemoteTask } from "./task-types";
 import { createGetTasksApi } from "./tasks-plugin";
 import type { ObsidianContext, OnUpdateFn, PointerDateTime } from "./types";
-import { askForConfirmation } from "./ui/confirmation-modal";
 import { createEditorMenuCallback } from "./ui/editor-menu";
 import { useDateRanges } from "./ui/hooks/use-date-ranges";
 import { useDebounceWithDelay } from "./ui/hooks/use-debounce-with-delay";
@@ -63,7 +64,6 @@ import MultiDayView from "./ui/multi-day-view";
 import { DayPlannerReleaseNotesView } from "./ui/release-notes";
 import { DayPlannerSettingsTab } from "./ui/settings-tab";
 import TimelineView from "./ui/timeline-view";
-import { createUndoNotice } from "./ui/undo-notice";
 import { createEnvironmentHooks } from "./util/create-environment-hooks";
 import { createRenderMarkdown } from "./util/create-render-markdown";
 import { createShowPreview } from "./util/create-show-preview";
@@ -77,8 +77,8 @@ export default class DayPlanner extends Plugin {
   private periodicNotes!: PeriodicNotes;
   private taskEntryEditor!: TaskEntryEditor;
   private vaultFacade!: VaultFacade;
-  private transactionWriter!: TransactionWriter;
   private metadataCacheFacade!: MetadataCacheFacade;
+  private timeLayer!: TimeLayerService;
 
   async onload() {
     const { vault, metadataCache } = this.app;
@@ -93,7 +93,6 @@ export default class DayPlanner extends Plugin {
 
     this.periodicNotes = new PeriodicNotes();
     this.vaultFacade = new VaultFacade(vault, getTasksApi);
-    this.transactionWriter = new TransactionWriter(this.vaultFacade);
     this.workspaceFacade = new WorkspaceFacade(
       this.app.workspace,
       this.vaultFacade,
@@ -101,6 +100,12 @@ export default class DayPlanner extends Plugin {
     );
     this.dataviewFacade = new DataviewFacade(() => getAPI(this.app), vault);
     this.metadataCacheFacade = new MetadataCacheFacade(metadataCache);
+    this.timeLayer = new TimeLayerService(
+      this,
+      vault,
+      this.periodicNotes,
+      currentTime,
+    );
 
     const {
       store,
@@ -277,6 +282,32 @@ export default class DayPlanner extends Plugin {
     });
 
     this.addCommand({
+      id: "open-today-time-layer-file",
+      name: "Open today's time-layer file",
+      callback: async () => {
+        const timeLayerFile = await this.timeLayer.ensureDayFile(
+          window.moment(),
+        );
+
+        await this.app.workspace.getLeaf(false).openFile(timeLayerFile);
+      },
+    });
+
+    this.addCommand({
+      id: "embed-today-actual-time-in-daily-note",
+      name: "Embed today's actual time in daily note",
+      callback: async () => {
+        await this.timeLayer.ensureActualEmbedInDailyNote(window.moment());
+
+        const dailyNote = await this.periodicNotes.createDailyNoteIfNeeded(
+          window.moment(),
+        );
+
+        await this.app.workspace.getLeaf(false).openFile(dailyNote);
+      },
+    });
+
+    this.addCommand({
       id: "reorder-tasks-by-time",
       name: "Sort tasks under cursor by time",
       editorCallback: (editor) => {
@@ -409,28 +440,15 @@ export default class DayPlanner extends Plugin {
       dataviewRefreshSignal,
     } = props;
 
-    let currentUndoNotice: Notice | undefined;
-
-    const onUpdate: OnUpdateFn = createUpdateHandler({
-      settings: this.settings,
-      transactionWriter: this.transactionWriter,
-      vaultFacade: this.vaultFacade,
-      periodicNotes: this.periodicNotes,
-      onEditConfirmed: () => {
-        currentUndoNotice?.hide();
-        currentUndoNotice = createUndoNotice(this.transactionWriter.undo);
-      },
+    const onUpdate: OnUpdateFn = createTimeLayerUpdateHandler({
+      timeLayer: this.timeLayer,
+      onEditConfirmed: () => {},
       onEditCanceled: () => {
         new Notice("Edit canceled");
 
         dispatch(editCanceled());
       },
       getTextInput: () => getTextFromUser(this.app),
-      getConfirmationInput: (input) =>
-        askForConfirmation({
-          ...input,
-          app: this.app,
-        }),
     });
 
     const onEditAborted = () => {
@@ -448,11 +466,13 @@ export default class DayPlanner extends Plugin {
 
     const dateRanges = useDateRanges();
     const visibleDays = useVisibleDays(dateRanges.ranges);
+    this.register(this.timeLayer.watchVisibleDays(visibleDays));
 
     const { tasksWithTimeForToday, editContext, newlyStartedTasks } = useTasks({
       onUpdate,
       onEditAborted,
       periodicNotes: this.periodicNotes,
+      timeLayer: this.timeLayer,
       dataviewFacade: this.dataviewFacade,
       metadataCache: this.app.metadataCache,
       workspaceFacade: this.workspaceFacade,
@@ -527,8 +547,8 @@ export default class DayPlanner extends Plugin {
       id: "jump-to-active-clock",
       name: "Jump to active clock",
       callback: () => {
-        const currentTasksWithActiveClockProps = selectActiveClocks(
-          store.getState(),
+        const currentTasksWithActiveClockProps = get(
+          this.timeLayer.activeActualTasks,
         );
 
         if (currentTasksWithActiveClockProps.length === 0) {
@@ -563,6 +583,7 @@ export default class DayPlanner extends Plugin {
       storeSignal: createSvelteSignalFromReduxStore(store),
       periodicNotes: this.periodicNotes,
       taskEntryEditor: this.taskEntryEditor,
+      timeLayer: this.timeLayer,
       workspaceFacade: this.workspaceFacade,
       initWeeklyView: this.initWeeklyLeaf,
       refreshDataviewFn: this.dataviewFacade.getAllTasksFrom,

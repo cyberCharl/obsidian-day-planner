@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { File } from "lucide-svelte";
+  import { Link } from "lucide-svelte";
+  import { fromStore } from "svelte/store";
   import { isNotVoid } from "typed-assert";
 
   import { getObsidianContext } from "../../context/obsidian-context";
-  import { selectRecentClocks } from "../../redux/tracker/tracker-selectors";
   import type { LocalTask } from "../../task-types";
-  import { createRecentClockMenu } from "../recent-clock-menu";
+  import { createTimeBlockMenu } from "../time-block-menu";
 
   import BlockList from "./block-list.svelte";
   import LocalTimeBlock from "./local-time-block.svelte";
@@ -13,22 +13,23 @@
   import Properties from "./Properties.svelte";
   import Selectable from "./selectable.svelte";
 
-  const { workspaceFacade, useSelectorV2, taskEntryEditor } =
-    getObsidianContext();
+  const { workspaceFacade, timeLayer } = getObsidianContext();
+  const recentLogRecords = fromStore(timeLayer.recentActualTasks);
 
-  const recentLogRecords = useSelectorV2((state) => selectRecentClocks(state));
+  function revealAttachedTask(task: LocalTask) {
+    const taskRef = task.timeLayer?.taskRef;
+
+    isNotVoid(taskRef, "Attached task reference is missing");
+
+    return workspaceFacade.revealLineInFile(taskRef.path, taskRef.line);
+  }
 </script>
 
 <BlockList list={recentLogRecords.current}>
   {#snippet match(task: LocalTask)}
     <Selectable
       onSecondarySelect={(event) =>
-        createRecentClockMenu({
-          event,
-          task,
-          taskEntryEditor,
-          workspaceFacade,
-        })}
+        createTimeBlockMenu({ event, task, workspaceFacade, timeLayer })}
     >
       {#snippet children({ use, onpointerup, state })}
         <LocalTimeBlock
@@ -39,18 +40,11 @@
         >
           {#snippet bottomDecoration()}
             <Properties>
-              {#if task.location?.path}
+              {#if task.timeLayer?.taskRef}
                 <Pill
-                  key={File}
-                  onpointerup={() => {
-                    isNotVoid(task.location);
-
-                    return workspaceFacade.revealLineInFile(
-                      task.location.path,
-                      task.location.position.start.line,
-                    );
-                  }}
-                  value={task.location.path.replace(/\.md$/, "")}
+                  key={Link}
+                  onpointerup={() => revealAttachedTask(task)}
+                  value={task.timeLayer.taskRef.path.replace(/\.md$/, "")}
                 />
               {/if}
             </Properties>

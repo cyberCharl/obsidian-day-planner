@@ -1,15 +1,15 @@
 <script lang="ts">
-  import { Play, Hourglass, File } from "lucide-svelte";
+  import { Play, Hourglass, Link } from "lucide-svelte";
+  import { fromStore } from "svelte/store";
   import { isNotVoid } from "typed-assert";
 
   import { getObsidianContext } from "../../context/obsidian-context";
   import { currentTimeSignal } from "../../global-store/current-time";
   import { settings } from "../../global-store/settings";
-  import { selectActiveClocks } from "../../redux/tracker/tracker-slice";
   import type { LocalTask } from "../../task-types";
   import * as m from "../../util/moment";
   import { getDiffInMinutes } from "../../util/moment";
-  import { createActiveClockMenu } from "../active-clock-menu";
+  import { createTimeBlockMenu } from "../time-block-menu";
 
   import BlockList from "./block-list.svelte";
   import LocalTimeBlock from "./local-time-block.svelte";
@@ -17,13 +17,11 @@
   import Properties from "./Properties.svelte";
   import Selectable from "./selectable.svelte";
 
-  const { workspaceFacade, taskEntryEditor, useSelector } =
-    getObsidianContext();
-
-  const activeLogRecords = useSelector(selectActiveClocks);
+  const { workspaceFacade, timeLayer } = getObsidianContext();
+  const activeLogRecords = fromStore(timeLayer.activeActualTasks);
   // todo: duplication?
   const activeLogRecordsCompat = $derived(
-    $activeLogRecords.map((it) => ({
+    activeLogRecords.current.map((it) => ({
       ...it,
       durationMinutes: getDiffInMinutes(
         it.startTime,
@@ -31,18 +29,21 @@
       ),
     })),
   );
+
+  function revealAttachedTask(task: LocalTask) {
+    const taskRef = task.timeLayer?.taskRef;
+
+    isNotVoid(taskRef, "Attached task reference is missing");
+
+    return workspaceFacade.revealLineInFile(taskRef.path, taskRef.line);
+  }
 </script>
 
 <BlockList list={activeLogRecordsCompat}>
   {#snippet match(task: LocalTask)}
     <Selectable
       onSecondarySelect={(event) =>
-        createActiveClockMenu({
-          event,
-          task,
-          taskEntryEditor,
-          workspaceFacade,
-        })}
+        createTimeBlockMenu({ event, task, workspaceFacade, timeLayer })}
     >
       {#snippet children({ use, onpointerup, state })}
         <LocalTimeBlock
@@ -53,18 +54,11 @@
         >
           {#snippet bottomDecoration()}
             <Properties>
-              {#if task.location?.path}
+              {#if task.timeLayer?.taskRef}
                 <Pill
-                  key={File}
-                  onpointerup={() => {
-                    isNotVoid(task.location);
-
-                    return workspaceFacade.revealLineInFile(
-                      task.location.path,
-                      task.location.position.start.line,
-                    );
-                  }}
-                  value={task.location.path.replace(/\.md$/, "")}
+                  key={Link}
+                  onpointerup={() => revealAttachedTask(task)}
+                  value={task.timeLayer.taskRef.path.replace(/\.md$/, "")}
                 />
               {/if}
               <Pill

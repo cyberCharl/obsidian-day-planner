@@ -34,6 +34,7 @@ function createProps({
     workspaceFacade,
     abortEditTrigger: writable(),
     localTasks: writable(tasks),
+    displayOnlyTasks: writable([]),
     remoteTasks: writable([]),
     pointerDateTime: writable<PointerDateTime>({
       dateTime: moment("2023-01-01 00:00"),

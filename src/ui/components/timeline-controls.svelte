@@ -25,6 +25,7 @@
     dataviewLoaded,
     reSync,
     periodicNotes,
+    timeLayer,
   } = getObsidianContext();
   const dateRange = getDateRangeContext();
 
@@ -58,6 +59,20 @@
     await workspaceFacade.openFileInEditor(noteForToday);
   }
 
+  async function openTimeFileForDay(day = $dateRange[0]) {
+    const timeFile = await timeLayer.ensureDayFile(day);
+
+    await workspaceFacade.openFileInEditor(timeFile);
+  }
+
+  async function embedActualTimeForDay(day = $dateRange[0]) {
+    await timeLayer.ensureActualEmbedInDailyNote(day);
+
+    const note = await periodicNotes.createDailyNoteIfNeeded(day);
+
+    await workspaceFacade.openFileInEditor(note);
+  }
+
   function handleReSyncClick(event: MouseEvent) {
     const menu = new Menu();
 
@@ -82,6 +97,20 @@
         .onClick(goToNoteForToday);
     });
 
+    menu.addItem((item) => {
+      item
+        .setTitle("Open time-layer file")
+        .setIcon("calendar-range")
+        .onClick(() => openTimeFileForDay());
+    });
+
+    menu.addItem((item) => {
+      item
+        .setTitle("Embed actual time in daily note")
+        .setIcon("link")
+        .onClick(() => embedActualTimeForDay());
+    });
+
     menu.showAtMouseEvent(event);
   }
 </script>
@@ -101,7 +130,7 @@
     </div>
 
     <ControlButton
-      label="Go to file"
+      label="Open daily note"
       onclick={async () => {
         const note = await periodicNotes.createDailyNoteIfNeeded($dateRange[0]);
 

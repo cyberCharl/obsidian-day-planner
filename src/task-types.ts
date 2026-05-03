@@ -4,6 +4,7 @@ import type { Pos } from "obsidian";
 
 import type { HorizontalPlacing } from "./overlap/horizontal-placing";
 import type { IcalConfig } from "./settings";
+import type { TimeLayerMetadata } from "./time-layer/types";
 import type { Props } from "./util/props";
 
 type EntryType = "listItem" | "task" | "icalEvent";
@@ -91,6 +92,7 @@ export interface LocalTask extends TaskTokens, BaseTask {
 
   // todo: move to Time
   durationMinutes: number;
+  timeLayer?: TimeLayerMetadata;
 }
 
 export type TaskWithoutComputedDuration = Omit<LocalTask, "durationMinutes"> &

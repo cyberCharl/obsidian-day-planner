@@ -8,6 +8,7 @@ import { type UseSelector, type useSelectorV2 } from "./redux/use-selector";
 import type { ListPropsParser } from "./service/list-props-parser";
 import type { PeriodicNotes } from "./service/periodic-notes";
 import type { TaskEntryEditor } from "./service/task-entry-editor";
+import type { TimeLayerService } from "./service/time-layer-service";
 import type { VaultFacade } from "./service/vault-facade";
 import type { WorkspaceFacade } from "./service/workspace-facade";
 import type { DayPlannerSettings, IcalConfig } from "./settings";
@@ -63,6 +64,7 @@ export interface ObsidianContext {
   storeSignal: Signal<RootState>;
   pointerDateTime: Writable<PointerDateTime>;
   taskEntryEditor: TaskEntryEditor;
+  timeLayer: TimeLayerService;
   dispatch: AppDispatch;
   useSelector: UseSelector;
   useSelectorV2: useSelectorV2;

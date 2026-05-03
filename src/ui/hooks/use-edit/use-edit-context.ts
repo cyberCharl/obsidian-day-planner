@@ -53,6 +53,7 @@ export function useEditContext(props: {
   onUpdate: OnUpdateFn;
   settings: Readable<DayPlannerSettings>;
   localTasks: Readable<LocalTask[]>;
+  displayOnlyTasks: Readable<Task[]>;
   remoteTasks: Readable<Task[]>;
   pointerDateTime: Readable<PointerDateTime>;
   abortEditTrigger: Readable<unknown>;
@@ -65,6 +66,7 @@ export function useEditContext(props: {
     onUpdate,
     settings,
     localTasks,
+    displayOnlyTasks,
     remoteTasks,
     pointerDateTime,
     abortEditTrigger,
@@ -118,9 +120,9 @@ export function useEditContext(props: {
   });
 
   const combinedTasks = derived(
-    [remoteTasks, tasksWithPendingUpdate],
-    ([$remoteTasks, $tasksWithPendingUpdate]) =>
-      $remoteTasks.concat($tasksWithPendingUpdate),
+    [remoteTasks, displayOnlyTasks, tasksWithPendingUpdate],
+    ([$remoteTasks, $displayOnlyTasks, $tasksWithPendingUpdate]) =>
+      $remoteTasks.concat($displayOnlyTasks, $tasksWithPendingUpdate),
   );
 
   const dayToDisplayedTasks = derived(combinedTasks, ($combinedTasks) => {

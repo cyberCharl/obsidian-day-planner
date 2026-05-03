@@ -5,7 +5,6 @@
   import { getObsidianContext } from "../../context/obsidian-context";
   import { getVisibleHours } from "../../global-store/derived-settings";
   import { settings } from "../../global-store/settings";
-  import { selectActiveClocks } from "../../redux/tracker/tracker-slice";
   import type { Task } from "../../task-types";
   import { createColumnSelectionMenu } from "../column-selection-menu";
 
@@ -24,9 +23,8 @@
   import Timeline from "./timeline.svelte";
   import UnscheduledTimeBlock from "./unscheduled-time-block.svelte";
 
-  const { editContext, useSelector, pointerDateTime } = getObsidianContext();
-
-  const activeLogRecords = useSelector(selectActiveClocks);
+  const { editContext, pointerDateTime, timeLayer } = getObsidianContext();
+  const activeActualBlocks = fromStore(timeLayer.activeActualTasks);
 
   const getDisplayedAllDayTasksForMultiDayRow = fromStore(
     editContext.getDisplayedAllDayTasksForMultiDayRow,
@@ -55,15 +53,15 @@
   <TimelineControls />
 
   {#if $settings.showActiveClocks}
-    <Tree title="Active clocks">
+    <Tree title="Active actual">
       {#snippet flair()}
-        {String($activeLogRecords.length)}
+        {String(activeActualBlocks.current.length)}
       {/snippet}
       <ActiveClocks />
     </Tree>
   {/if}
 
-  <Tree title="Recent clocks">
+  <Tree title="Recent actual">
     <RecentClocks />
   </Tree>
 

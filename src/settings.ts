@@ -107,7 +107,7 @@ export const defaultSettings: DayPlannerSettings = {
   multiDayRange: "3-days",
   showActiveClocks: false,
   showTimelineInSidebar: true,
-  timelineColumns: { planner: true, timeTracker: false },
+  timelineColumns: { planner: true, timeTracker: true },
 };
 
 export const defaultSettingsForTests = {

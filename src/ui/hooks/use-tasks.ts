@@ -4,6 +4,7 @@ import { derived, type Readable, type Writable } from "svelte/store";
 
 import { DataviewFacade } from "../../service/dataview-facade";
 import type { PeriodicNotes } from "../../service/periodic-notes";
+import type { TimeLayerService } from "../../service/time-layer-service";
 import { WorkspaceFacade } from "../../service/workspace-facade";
 import type { DayPlannerSettings } from "../../settings";
 import type { RemoteTask, Task, WithTime } from "../../task-types";
@@ -32,6 +33,7 @@ export function useTasks(props: {
   dataviewChange: Readable<unknown>;
   remoteTasks: Readable<RemoteTask[]>;
   periodicNotes: PeriodicNotes;
+  timeLayer: TimeLayerService;
 }) {
   const {
     settingsStore,
@@ -48,6 +50,7 @@ export function useTasks(props: {
     onUpdate,
     onEditAborted,
     remoteTasks,
+    timeLayer,
   } = props;
 
   const visibleDailyNotes = useVisibleDailyNotes(
@@ -65,16 +68,46 @@ export function useTasks(props: {
     refreshSignal: debouncedTaskUpdateTrigger,
   });
 
-  const localTasks = useVisibleDataviewTasks(
+  const dataviewTasksForVisibleDays = useVisibleDataviewTasks(
     dataviewTasks,
     visibleDays,
     periodicNotes,
   );
 
+  const plannedTasks = timeLayer.plannedTasks;
+
+  const unscheduledTasks = derived(
+    [dataviewTasksForVisibleDays, plannedTasks],
+    ([$dataviewTasksForVisibleDays, $plannedTasks]) => {
+      const attachedTaskKeys = new Set(
+        $plannedTasks
+          .map((task) => task.timeLayer?.taskRef)
+          .filter((taskRef) => taskRef !== undefined)
+          .map((taskRef) => `${taskRef.path}::${taskRef.line}`),
+      );
+
+      return $dataviewTasksForVisibleDays.filter((task) => {
+        if (!task.isAllDayEvent) {
+          return false;
+        }
+
+        const location = task.location;
+
+        if (!location) {
+          return true;
+        }
+
+        const taskKey = `${location.path}::${location.position.start.line}`;
+
+        return !attachedTaskKeys.has(taskKey);
+      });
+    },
+  );
+
   const tasksWithTimeForToday = derived(
-    [localTasks, remoteTasks, currentTime],
-    ([$localTasks, $remoteTasks, $currentTime]: [Task[], Task[], Moment]) => {
-      return $localTasks
+    [plannedTasks, remoteTasks, currentTime],
+    ([$plannedTasks, $remoteTasks, $currentTime]: [Task[], Task[], Moment]) => {
+      return $plannedTasks
         .concat($remoteTasks)
         .filter(
           (task): task is WithTime<Task> =>
@@ -84,7 +117,7 @@ export function useTasks(props: {
   );
 
   const abortEditTrigger = derived(
-    [localTasks, dataviewChange],
+    [plannedTasks, dataviewChange],
     getUpdateTrigger,
   );
 
@@ -94,7 +127,8 @@ export function useTasks(props: {
     onUpdate,
     onEditAborted,
     settings: settingsStore,
-    localTasks,
+    localTasks: plannedTasks,
+    displayOnlyTasks: unscheduledTasks,
     remoteTasks,
     pointerDateTime,
     abortEditTrigger,
