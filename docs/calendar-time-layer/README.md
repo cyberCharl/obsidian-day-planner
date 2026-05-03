@@ -2,7 +2,7 @@
 
 This folder adapts NeoArtemis planning notes into fork-specific documentation for `obsidian-day-planner`.
 
-The goal is to define the product direction for a calendar-first fork without modifying upstream behavior yet. This is planning and handoff material, not an implementation branch.
+The branch now has an active MVP implementation in progress. These docs still capture product direction, but they also need to stay aligned with the storage model and UI slice that now exists in code.
 
 ## Fork framing
 
@@ -29,6 +29,7 @@ These files are the main starting points for implementation work:
 - `src/feature/time-tracking-feature.ts` indexes time-tracking data across markdown files.
 - `src/service/task-entry-editor.ts` mutates task props for clock in/out flows.
 - `src/tasks-plugin.ts` is the integration boundary with the Tasks plugin API.
+- `src/service/time-layer-service.ts` is the plugin-owned day-file storage and mutation layer for the MVP.
 
 ## Documents
 
@@ -37,3 +38,5 @@ These files are the main starting points for implementation work:
 - `ux-loop.md` describes the intended day-planning interaction loop.
 - `first-principles.md` records the underlying requirements and system split.
 - `HANDOFF.md` gives the next implementer a concrete starting point.
+- `technical-assessment.md` explains why the MVP moved to a plugin-owned per-day time file.
+- `time-file-format.md` documents the concrete markdown format currently written by the plugin.
